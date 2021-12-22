@@ -15,27 +15,29 @@ class Annotations:
 
 		# decompress annotations and correct the overlapping pixels
 		self._annotations = self._correct_overlap(
-			self._decompress(img_data, idx, dtype)
+			self._decompress(img_data, idx, dtype), dtype
 		)
 
-		# calculate bounds, the boundaries that touch of neighbouring
-		# annotations
+		# determine boundaries of each annotation
 		bounds_tensor, self.bounds = self._bounds(self._annotations)
 
-		# calculate mask from the annotations and boundaries
-		self.mask = self._mask(self._annotations, bounds_tensor)
+		# determine boundaries that touch of neighbouring annotations
+		touch_tensor, self.touch = self._touch(bounds_tensor)
+
+		# calculate mask from the annotations and touching boundaries
+		self.mask = self._mask(self._annotations, touch_tensor)
 
 	def __call__(self, *args, **kwargs):
 		return self._annotations
 
 	@classmethod
-	def _correct_overlap(cls, annotations):
+	def _correct_overlap(cls, annotations, dtype):
 		# calculate center of each annotation
 		#     after pixels are added/removed, the center changes, the choice
 		#     is made not to recalculate the center in such case due to the
 		#     computational overhead involved
 		# todo: find a more computational efficient way of implementing this
-		centers = torch.stack([cls._center(a) for a in annotations])
+		centers = torch.stack([cls._center(a, dtype) for a in annotations])
 
 		# find all overlapping pixels
 		overlap = cls._overlap(annotations)
@@ -101,10 +103,10 @@ class Annotations:
 		return annotation_img
 
 	@staticmethod
-	def _center(annotation):
+	def _center(annotation, dtype):
 		return torch.round(torch.mean(torch.nonzero(
 			annotation, as_tuple=False
-		).type(torch.float), 0))
+		).type(dtype), 0))
 
 	@staticmethod
 	def _overlap(annotations):
@@ -137,29 +139,39 @@ class Annotations:
 	def _bounds(cls, annotations):
 		""" Image of touching boundaries from neighbouring annotations """
 
-		# calculate edges in x and y direction and combine these to get all
-		# edges
+		# efficiently calculate gradient in x and y direction, knowing that
+		#   all values and result are/should be boolean (i.e. 1's and 0's).
 		n, y, x = annotations.shape
-		ay = torch.zeros(n, y + 1, x)
-		ax = torch.zeros(n, y, x + 1)
-		ay[:, :-1, :] = annotations
-		ax[:, :, :-1] = annotations
-		edges_x = torch.abs(ax[:, :, 1:] - ax[:, :, :-1])
-		edges_y = torch.abs(ay[:, 1:, :] - ay[:, :-1, :])
-		edges = edges_x + edges_y
-		edges[edges > 1] = 1
+		dx = torch.zeros(n, y, x + 2)
+		dy = torch.zeros(n, y + 2, x)
+		dx[:, :, 1:-1] = annotations
+		dy[:, 1:-1, :] = annotations
+		dx = torch.abs(dx[:, :, 2:] - dx[:, :, :-2])
+		dy = torch.abs(dy[:, 2:, :] - dy[:, :-2, :])
+		bounds = dx + dy
+		bounds[bounds > 1] = 1
+		bounds = torch.sum(bounds, 0)
 
-		# create touching bounds mask/img
-		#    This is done by adding all edges together. The pixel value of an
-		#    edge is 1, so the sum of touching bounds will be >1. This is
-		#    used to create the touching bounds mask/img
-		bounds = torch.clamp(torch.sum(edges, 0) - 1, 0, 1)
-
-		# return the bounds as pil image
-		return bounds, cls._to_pil(bounds)
+		# return bounds as tensor and as image
+		return bounds, cls._to_pil(bounds.clamp(0, 1))
 
 	@classmethod
-	def _mask(cls, annotations, bounds):
+	def _touch(cls, bounds):
+		"""
+		create touching bounds mask/img
+
+		bounds tensor is created by adding all edges together. The pixel
+		value of an edge is 1, so the sum of touching bounds will be >1.
+		Hence all pixels with value larger than 1 are boundaries that touch
+		"""
+
+		touch = torch.clamp(bounds - 1, 0, 1)
+
+		# return the bounds as pil image
+		return touch, cls._to_pil(touch)
+
+	@classmethod
+	def _mask(cls, annotations, touch):
 		"""
 		create mask from annotations and bounds (i.e. touching boundaries
 		between annotations).
@@ -172,7 +184,7 @@ class Annotations:
 
 		# calculate mask
 		mask = torch.clamp(
-			torch.sum(annotations, 0) - bounds,
+			torch.sum(annotations, 0) - touch,
 			0, 1
 		)
 

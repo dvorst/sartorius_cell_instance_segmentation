@@ -137,11 +137,10 @@ class CombinedLoss(nn.Module):
 		self.bce_loss = nn.BCEWithLogitsLoss()
 
 	def forward(self, pred_3, pred_canny, pred_1, pred_2, msk, canny_label):
-		dice_loss_3 = self.dice_loss(pred_3, msk)
-		loss_pred_3 = self.ce_loss(pred_3, msk) + dice_loss_3
+		msk = msk.squeeze().type(torch.int64)
 		loss_pred_1 = self.ce_loss(pred_1, msk) + self.dice_loss(pred_1, msk)
 		loss_pred_2 = self.ce_loss(pred_2, msk) + self.dice_loss(pred_2, msk)
-		loss_canny = self.bce_loss(pred_canny, canny_label.unsqueeze(1))
+		loss_pred_3 = self.ce_loss(pred_3, msk) + self.dice_loss(pred_3, msk)
+		loss_canny = self.bce_loss(pred_canny, canny_label)
 		loss = loss_pred_3 + loss_pred_1 + loss_pred_2 + loss_canny
-
-		return loss, dice_loss_3
+		return loss

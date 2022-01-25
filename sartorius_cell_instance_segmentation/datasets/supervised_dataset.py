@@ -4,14 +4,14 @@ import torch
 import torch.utils.data
 import torchvision
 import torchvision.transforms.functional
-import PIL
+import PIL.Image
 import matplotlib.pyplot as plt
 import pathlib
 import zipfile
 import cv2
 import dataclasses
 
-from .annotations import Annotations
+from .annotations import to_annotation
 from sartorius_cell_instance_segmentation.util import imshow
 
 
@@ -41,16 +41,14 @@ class SupervisedDataset(torch.utils.data.Dataset):
 		self.target_transforms = target_transforms
 		self.dtype = dtype
 
+		# remove zip file when forced to re-convert the data
 		if force_convert:
 			if pathlib.Path(zip_data).exists():
 				pathlib.Path(zip_data).unlink()
 
 		# convert data to zip if not done already
 		if not pathlib.Path(zip_data).exists():
-			self._convert_data(
-				train_csv, dir_imgs, zip_data, imgs_extension, dtype,
-				print_progress, n_imgs
-			)
+			self._convert_data(train_csv, dir_imgs, zip_data, imgs_extension, print_progress, n_imgs)
 
 		# load data
 		self.items, self.map = self._load_data(
@@ -113,9 +111,7 @@ class SupervisedDataset(torch.utils.data.Dataset):
 
 	@classmethod
 	def _convert_data(
-			cls, train_csv, dir_imgs, zip_data, imgs_extension, dtype,
-			print_progress, n_imgs
-	):
+			cls, train_csv, dir_imgs, zip_data, imgs_extension, print_progress, n_imgs):
 		""" Convert and save data provided by the challenge as a zipfile """
 
 		print('SupervisedDataset: converting data...')
@@ -137,20 +133,21 @@ class SupervisedDataset(torch.utils.data.Dataset):
 				filename = f'{pth.stem}.{imgs_extension}'
 
 				# convert data to annotations
-				annotations = Annotations(data, pth.stem, dtype)
+				# annotations = Annotations(data, pth.stem)
+				annotations = to_annotation(data, pth.stem)
 
 				# add img to zipfile
 				zf.write(pth, f'imgs/{filename}')
 
-				# Add the annotation boundaries that touch each other to zip
+				# Add the annotation boundaries
 				with zf.open(f'bounds/{filename}', 'w') as file:
 					annotations.bounds.save(file, 'png', optimize=True)
 
-				# Add the annotation boundaries that touch each other to zip
+				# Add the annotation boundaries that touch each other
 				with zf.open(f'touch/{filename}', 'w') as file:
 					annotations.touch.save(file, 'png', optimize=True)
 
-				# convert annotations to image and add it to zipfile
+				# add the annotation mask
 				with zf.open(f'masks/{filename}', 'w') as file:
 					annotations.mask.save(file, 'png', optimize=True)
 
@@ -177,27 +174,20 @@ class SupervisedDataset(torch.utils.data.Dataset):
 			# read imgs, bounds and masks as dict
 			items = {}
 			for idx in map_:
-				img = cls._load_zip_img(
-					zf, f'imgs/{idx}.{imgs_extension}', dtype
-				)
-				canny = torch.tensor(cv2.Canny(
-					(img.numpy() * 255).astype(np.uint8).squeeze(), 10, 100
-				) / 255., dtype=dtype).unsqueeze(0)
-				bounds = cls._load_zip_img(
-					zf, f'bounds/{idx}.{imgs_extension}', dtype
-				)
-				touch = cls._load_zip_img(
-					zf, f'touch/{idx}.{imgs_extension}', dtype
-				)
-				mask = cls._load_zip_img(
-					zf, f'masks/{idx}.{imgs_extension}', dtype
-				)
-				items[idx] = cls.Item(
-					img=img, canny=canny, bounds=bounds,
-					touch=touch, mask=mask
-				)
+				img = cls._load_zip_img(zf, f'imgs/{idx}.{imgs_extension}', dtype)
+				canny = cls._canny(img, dtype)
+				bounds = cls._load_zip_img(zf, f'bounds/{idx}.{imgs_extension}', dtype)
+				touch = cls._load_zip_img(zf, f'touch/{idx}.{imgs_extension}', dtype)
+				mask = cls._load_zip_img(zf, f'masks/{idx}.{imgs_extension}', dtype)
+				items[idx] = cls.Item(img=img, canny=canny, bounds=bounds, touch=touch, mask=mask)
 
 		return items, map_
+
+	@staticmethod
+	def _canny(img, dtype):
+		return torch.tensor(cv2.Canny(
+			(img.numpy() * 255).astype(np.uint8).squeeze(), threshold1=10, threshold2=100
+		) / 255., dtype=dtype).unsqueeze(0)
 
 	@staticmethod
 	def _gray_img_to_col(gray_img: torch.tensor, color):
@@ -206,9 +196,10 @@ class SupervisedDataset(torch.utils.data.Dataset):
 	@staticmethod
 	def _load_zip_img(zf, filename, dtype):
 		with zf.open(filename, 'r') as file:
-			return torch.as_tensor(np.array(
-				PIL.Image.open(file)), dtype=dtype
-			).unsqueeze(0) / 255  # change dtype to inherit dtype of class
+			return (torchvision.transforms.functional.pil_to_tensor(PIL.Image.open(file)) / 255).to(dtype)
+			# return torch.as_tensor(np.array(
+			#     PIL.Image.open(file)), dtype=dtype
+			# ).unsqueeze(0) / 255  # change dtype to inherit dtype of class
 
 	@staticmethod
 	def _sanity_check(data_ids, img_ids):

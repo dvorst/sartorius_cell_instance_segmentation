@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import tensorboard
 import tensorboard.program
 import tensorboard.main
+from numba import njit
+import pstats
+import cProfile
 
 from sartorius_cell_instance_segmentation.datasets import SupervisedDataset
 from sartorius_cell_instance_segmentation.models import MSRF, DummyNet
@@ -14,6 +17,14 @@ from sartorius_cell_instance_segmentation import Train
 from sartorius_cell_instance_segmentation.util import imshow
 from sartorius_cell_instance_segmentation import CombinedLoss
 
+
+# timing template
+# with cProfile.Profile() as pr:
+#     pass  # function here
+# stats = pstats.Stats(pr)
+# stats.sort_stats(pstats.SortKey.TIME)
+# stats.print_stats()
+# stats.dump_stats(filename='temp/t8.prof')
 
 def main():
 	"""
@@ -39,7 +50,7 @@ def main():
 		dir_imgs='data/sartorius-cell-instance-segmentation/train',
 		zip_data='data/SupervisedDataset.zip',
 		force_convert=False,
-		n_imgs=10
+		n_imgs=50
 	)
 
 	# train & valid dataset
@@ -62,22 +73,7 @@ def main():
 		shuffle=False
 	)
 
-	# print(len(ds))
-	# print(len(dl_train))
-	# print(len(dl_valid))
-	# for img, bounds, touch, mask in dl_train:
-	# 	print(img.shape)
-	# 	print(bounds.shape)
-	# 	print(touch.shape)
-	# 	print(mask.shape)
-	# 	print(img.dtype)
-	# 	print(bounds.dtype)
-	# 	print(touch.dtype)
-	# 	print(mask.dtype)
-	# 	idx = 1
-	# 	imshow(ds.overlay(img[idx], bounds[idx], touch[idx], mask[idx]))
-	# 	plt.show()
-	# 	break
+	# test_ds(ds=ds, dl_train=dl_train, dl_valid=dl_valid)
 
 	"""
 	Training
@@ -95,12 +91,7 @@ def main():
 
 	optimizer = torch.optim.Adam(model.parameters())
 
-	# if __name__ == "__main__":
-	# 	x = torch.randn((2, 1, 128, 128)).type(dtype)
-	# 	canny = torch.randn((2, 1, 128, 128)).type(dtype)
-	# 	out = model(x, canny)
-	# 	for o in out:
-	# 		print(o.shape)
+	# test_model(model=model, dtype=dtype)
 
 	Train(
 		epochs=epochs,
@@ -112,6 +103,42 @@ def main():
 		criterion=criterion,
 		dtype=dtype
 	)
+
+
+def test_ds(ds, dl_train, dl_valid):
+	print(f'{len(ds)=}')
+	print(f'{len(dl_train)=}')
+	print(f'{len(dl_valid)}')
+	for img, canny, bounds, touch, mask in dl_train:
+		print(f'{img.shape=}')
+		print(f'{canny.shape=}')
+		print(f'{bounds.shape=}')
+		print(f'{touch.shape=}')
+		print(f'{mask.shape=}')
+
+		print(f'{img.dtype=}')
+		print(f'{canny.dtype=}')
+		print(f'{bounds.dtype=}')
+		print(f'{touch.dtype=}')
+		print(f'{mask.dtype=}')
+
+		idx = 2
+		imshow(img[idx])
+		imshow(canny[idx])
+		imshow(bounds[idx])
+		imshow(touch[idx])
+		imshow(mask[idx])
+		imshow(ds.overlay(img[idx], bounds[idx], touch[idx], mask[idx]))
+		plt.show()
+		break
+
+
+def test_model(model, dtype):
+	x = torch.randn((2, 1, 128, 128)).type(dtype)
+	canny = torch.randn((2, 1, 128, 128)).type(dtype)
+	out = model(x, canny)
+	for o in out:
+		print(o.shape)
 
 
 if __name__ == "__main__":

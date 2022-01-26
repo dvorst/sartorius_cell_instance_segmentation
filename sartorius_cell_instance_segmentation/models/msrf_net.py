@@ -1,3 +1,7 @@
+"""
+original code: https://github.com/amlarraz/MSRF-Net_PyTorch/blob/master/msrf.py
+"""
+
 from abc import ABC
 
 import torch
@@ -6,137 +10,84 @@ import torch.nn.functional as func
 from torchvision.models.resnet import BasicBlock
 
 
-# BLOCKS to construct the model
 class DSDFBlock(nn.Module, ABC):
+	""" Dual-Scale Dense Fusion """
+
 	def __init__(self, in_ch_x, in_ch_y, nf1=128, nf2=256, gc=64, bias=True):
 		super().__init__()
 
 		self.nx1 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_x, gc, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1),
-				bias=bias
-			),
+			nn.Conv2d(in_ch_x, gc, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.ny1 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_y, gc, kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1), bias=bias
-			),
+			nn.Conv2d(in_ch_y, gc, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.nx1c = nn.Sequential(
-			nn.Conv2d(
-				in_ch_x, gc, kernel_size=(4, 4), stride=(2, 2),
-				padding=(1, 1), bias=bias
-			),  # ks 3 -> 4, stride 1 -> 2
+			nn.Conv2d(in_ch_x, gc, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1), bias=bias),
+			# ks 3 -> 4, stride 1 -> 2
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.ny1t = nn.Sequential(
 			nn.ConvTranspose2d(
-				in_ch_y, gc, kernel_size=(4, 4), stride=(2, 2),
-				padding=(1, 1), bias=bias
-			),  # ks 3 -> 4
+				in_ch_y, gc, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1), bias=bias),  # ks 3 -> 4
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.nx2 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_x + gc + gc, gc, kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1), bias=bias
-			),
+			nn.Conv2d(in_ch_x + 2 * gc, gc, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.ny2 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_y + gc + gc, gc, kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1), bias=bias
-			),
+			nn.Conv2d(in_ch_y + 2 * gc, gc, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.nx2c = nn.Sequential(
-			nn.Conv2d(
-				gc, gc, kernel_size=(4, 4), stride=(2, 2),
-				padding=(1, 1), bias=bias
-			),  # ks 3 -> 4, stride 1 -> 2
+			nn.Conv2d(gc, gc, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1), bias=bias),  # ks 3 -> 4, stride 1 -> 2
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.ny2t = nn.Sequential(
-			nn.ConvTranspose2d(
-				gc, gc, kernel_size=(4, 4), stride=(2, 2),
-				padding=(1, 1), bias=bias
-			),  # ks 3 -> 4
+			nn.ConvTranspose2d(gc, gc, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1), bias=bias),  # ks 3 -> 4
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.nx3 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_x + gc + gc + gc, gc, kernel_size=(3, 3),
-				stride=(1, 1), padding=(1, 1), bias=bias
-			),
+			nn.Conv2d(in_ch_x + 3 * gc, gc, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.ny3 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_y + gc + gc + gc, gc, kernel_size=(3, 3),
-				stride=(1, 1), padding=(1, 1), bias=bias
-			),
+			nn.Conv2d(in_ch_y + 3 * gc, gc, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.nx3c = nn.Sequential(
-			nn.Conv2d(
-				gc, gc, kernel_size=(4, 4), stride=(2, 2),
-				padding=(1, 1), bias=bias
-			),  # ks 3 -> 4, stride 1 -> 2
+			nn.Conv2d(gc, gc, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1), bias=bias),  # ks 3 -> 4, stride 1 -> 2
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.ny3t = nn.Sequential(
-			nn.ConvTranspose2d(
-				gc, gc, kernel_size=(4, 4), stride=(2, 2),
-				padding=(1, 1), bias=bias
-			),  # ks 3 -> 4
+			nn.ConvTranspose2d(gc, gc, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1), bias=bias),  # ks 3 -> 4
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.nx4 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_x + gc + gc + gc + gc, gc, kernel_size=(3, 3),
-				stride=(1, 1), padding=(1, 1), bias=bias
-			),
+			nn.Conv2d(in_ch_x + 4 * gc, gc, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.ny4 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_y + gc + gc + gc + gc, gc, kernel_size=(3, 3),
-				stride=(1, 1), padding=(1, 1), bias=bias
-			),
+			nn.Conv2d(in_ch_y + 4 * gc, gc, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.nx4c = nn.Sequential(
-			nn.Conv2d(
-				gc, gc, kernel_size=(4, 4), stride=(2, 2),
-				padding=(1, 1), bias=bias
-			),  # ks 3 -> 4, stride 1 -> 2
+			nn.Conv2d(gc, gc, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1), bias=bias),  # ks 3 -> 4, stride 1 -> 2
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.ny4t = nn.Sequential(
-			nn.ConvTranspose2d(
-				gc, gc, kernel_size=(4, 4), stride=(2, 2),
-				padding=(1, 1), bias=bias
-			),  # ks 3 -> 4
+			nn.ConvTranspose2d(gc, gc, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1), bias=bias),  # ks 3 -> 4
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.nx5 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_x + gc + gc + gc + gc + gc, nf1,
-				kernel_size=(3, 3), stride=(1, 1), padding=(1, 1),
-				bias=bias
-			),
+			nn.Conv2d(in_ch_x + 5 * gc, nf1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 		self.ny5 = nn.Sequential(
-			nn.Conv2d(
-				in_ch_y + gc + gc + gc + gc + gc, nf2,
-				kernel_size=(3, 3), stride=(1, 1), padding=(1, 1),
-				bias=bias
-			),
+			nn.Conv2d(in_ch_y + 5 * gc, nf2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=bias),
 			nn.LeakyReLU(negative_slope=0.25))
 
 	def forward(self, x, y):
@@ -188,45 +139,27 @@ class DSDFBlock(nn.Module, ABC):
 class AttentionBlock(nn.Module, ABC):  # OK
 	def __init__(self, in_ch_x, in_ch_g, med_ch):
 		super().__init__()
-		self.theta = nn.Conv2d(
-			in_ch_x, med_ch, kernel_size=(2, 2),
-			stride=(2, 2), padding=(0, 0), bias=True
-		)
-		self.phi = nn.Conv2d(
-			in_ch_g, med_ch, kernel_size=(1, 1),
-			stride=(1, 1), padding=(0, 0), bias=True
-		)
+		self.theta = nn.Conv2d(in_ch_x, med_ch, kernel_size=(2, 2), stride=(2, 2), padding=(0, 0), bias=True)
+		self.phi = nn.Conv2d(in_ch_g, med_ch, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0), bias=True)
 		self.block = nn.Sequential(
 			nn.ReLU(),
-			nn.Conv2d(
-				med_ch, 1, kernel_size=(1, 1),
-				stride=(1, 1), padding=(0, 0),
-				bias=True
-			),
+			nn.Conv2d(med_ch, 1, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0), bias=True),
 			nn.Sigmoid(),
-			nn.ConvTranspose2d(
-				1, 1, kernel_size=(2, 2),
-				stride=(2, 2),
-				padding=(0, 0),
-				bias=True
-			)
+			nn.ConvTranspose2d(1, 1, kernel_size=(2, 2), stride=(2, 2), padding=(0, 0), bias=True)
 		)
-		self.batchnorm = nn.BatchNorm2d(in_ch_x)
+		self.bn = nn.BatchNorm2d(in_ch_x)
 
 	def forward(self, x, g):
 		theta = self.theta(x) + self.phi(g)
-		out = self.batchnorm(self.block(theta) * x)
+		out = self.bn(self.block(theta) * x)
 		return out
 
 
 class UpBlock(nn.Module, ABC):  # OK
 	def __init__(self, input_1_ch, input_2_ch):
 		super().__init__()
-		self.up = nn.ConvTranspose2d(
-			input_2_ch, input_1_ch,
-			kernel_size=(2, 2), stride=(2, 2),
-			padding=(0, 0), bias=True
-		)
+		self.up = nn.ConvTranspose2d(input_2_ch, input_1_ch, kernel_size=(2, 2), stride=(2, 2), padding=(0, 0),
+		                             bias=True)
 
 	def forward(self, input_1, input_2):
 		x = torch.cat([self.up(input_2), input_1], dim=1)
@@ -358,18 +291,19 @@ class GSCBlock(nn.Module, ABC):
 # https://github.com/leftthomas/GatedSCNN/blob/master/model.py
 
 class GatedConv(nn.Conv2d, ABC):
-	def __init__(self, in_channels, out_channels):
-		super().__init__(in_channels, out_channels, 1, bias=False)
+	def __init__(self, ci, co):
+		super().__init__(in_channels=ci, out_channels=co, kernel_size=1, bias=False)
 		self.attention = nn.Sequential(
-			nn.BatchNorm2d(in_channels + 1),
-			nn.Conv2d(in_channels + 1, in_channels + 1, 1),
+			nn.BatchNorm2d(ci + 1),
+			nn.Conv2d(ci + 1, ci + 1, 1),
 			nn.ReLU(),
-			nn.Conv2d(in_channels + 1, 1, 1),
+			nn.Conv2d(ci + 1, 1, 1),
 			nn.BatchNorm2d(1),
 			nn.Sigmoid()
 		)
 
-	def forward(self, feat, gate):
+	def forward(self, x):
+		feat, gate = x[0], x[1]
 		attention = self.attention(torch.cat((feat, gate), dim=1))
 		out = func.conv2d(feat * (attention + 1), self.weight)
 		return out
@@ -419,240 +353,120 @@ class ShapeStream(nn.Module, ABC):
 
 # MODEL  (NOT CHECKED)
 class MSRF(nn.Module, ABC):
-	def __init__(self, in_ch, n_classes, init_feat=32):
+	def __init__(self, ci, n_classes, feat=32):
+		""" ci: in_channels, feat: features"""
 		super().__init__()
 
 		# ENCODER ----------------------------
 		self.n11 = nn.Sequential(
-			nn.Conv2d(
-				in_ch, init_feat, kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(ci, feat, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.Conv2d(
-				init_feat, init_feat, kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(feat, feat, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.BatchNorm2d(init_feat),
-			SEBlock(init_feat, ratio=init_feat // 2)
+			nn.BatchNorm2d(feat),
+			SEBlock(feat, ratio=feat // 2)
 		)
 
 		self.n21 = nn.Sequential(
 			nn.MaxPool2d(kernel_size=(2, 2)),
 			nn.Dropout(0.2),
-			nn.Conv2d(
-				init_feat, init_feat * 2,
-				kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(feat, feat * 2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.Conv2d(
-				init_feat * 2, init_feat * 2,
-				kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(feat * 2, feat * 2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.BatchNorm2d(init_feat * 2),
-			SEBlock(init_feat * 2, ratio=init_feat // 2)
+			nn.BatchNorm2d(feat * 2),
+			SEBlock(feat * 2, ratio=feat // 2)
 		)
 
 		self.n31 = nn.Sequential(
 			nn.MaxPool2d(kernel_size=(2, 2)),
 			nn.Dropout(0.2),
-			nn.Conv2d(
-				init_feat * 2, init_feat * 4,
-				kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(feat * 2, feat * 4, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.Conv2d(
-				init_feat * 4, init_feat * 4,
-				kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(feat * 4, feat * 4, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.BatchNorm2d(init_feat * 4),
-			SEBlock(init_feat * 4, ratio=init_feat // 2)
+			nn.BatchNorm2d(feat * 4),
+			SEBlock(feat * 4, ratio=feat // 2)
 		)
 
 		self.n41 = nn.Sequential(
 			nn.MaxPool2d(kernel_size=(2, 2)),
 			nn.Dropout(0.2),
-			nn.Conv2d(
-				init_feat * 4, init_feat * 8,
-				kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(feat * 4, feat * 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.Conv2d(
-				init_feat * 8, init_feat * 8,
-				kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(feat * 8, feat * 8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.BatchNorm2d(init_feat * 8)
+			nn.BatchNorm2d(feat * 8)
 		)
 		# MSRF-subnetwork ----------------------------
-		self.dsfs_1 = DSDFBlock(
-			init_feat, init_feat * 2, nf1=init_feat,
-			nf2=init_feat * 2, gc=init_feat // 2
-		)
-		self.dsfs_2 = DSDFBlock(
-			init_feat * 4, init_feat * 8,
-			nf1=init_feat * 4, nf2=init_feat * 8,
-			gc=init_feat * 4 // 2
-		)
-		self.dsfs_3 = DSDFBlock(
-			init_feat, init_feat * 2, nf1=init_feat,
-			nf2=init_feat * 2, gc=init_feat // 2
-		)
-		self.dsfs_4 = DSDFBlock(
-			init_feat * 4, init_feat * 8,
-			nf1=init_feat * 4, nf2=init_feat * 8,
-			gc=init_feat * 4 // 2
-		)
-		self.dsfs_5 = DSDFBlock(
-			init_feat * 2, init_feat * 4,
-			nf1=init_feat * 2, nf2=init_feat * 4,
-			gc=init_feat * 2 // 2
-		)
-		self.dsfs_6 = DSDFBlock(
-			init_feat, init_feat * 2, nf1=init_feat,
-			nf2=init_feat * 2, gc=init_feat // 2
-		)
-		self.dsfs_7 = DSDFBlock(
-			init_feat * 4, init_feat * 8,
-			nf1=init_feat * 4, nf2=init_feat * 8,
-			gc=init_feat * 4 // 2
-		)
-		self.dsfs_8 = DSDFBlock(
-			init_feat * 2, init_feat * 4,
-			nf1=init_feat * 2, nf2=init_feat * 4,
-			gc=init_feat * 2 // 2
-		)
-		self.dsfs_9 = DSDFBlock(
-			init_feat, init_feat * 2, nf1=init_feat,
-			nf2=init_feat * 2, gc=init_feat // 2
-		)
-		self.dsfs_10 = DSDFBlock(
-			init_feat * 4, init_feat * 8,
-			nf1=init_feat * 4, nf2=init_feat * 8,
-			gc=init_feat * 4 // 2
-		)
+		self.dsfs_01 = DSDFBlock(feat * 1, feat * 2, nf1=feat * 1, nf2=feat * 2, gc=feat * 1 // 2)
+		self.dsfs_02 = DSDFBlock(feat * 4, feat * 8, nf1=feat * 4, nf2=feat * 8, gc=feat * 4 // 2)
+		self.dsfs_03 = DSDFBlock(feat * 1, feat * 2, nf1=feat * 1, nf2=feat * 2, gc=feat * 1 // 2)
+		self.dsfs_04 = DSDFBlock(feat * 4, feat * 8, nf1=feat * 4, nf2=feat * 8, gc=feat * 4 // 2)
+		self.dsfs_05 = DSDFBlock(feat * 2, feat * 4, nf1=feat * 2, nf2=feat * 4, gc=feat * 2 // 2)
+		self.dsfs_06 = DSDFBlock(feat * 1, feat * 2, nf1=feat * 1, nf2=feat * 2, gc=feat * 1 // 2)
+		self.dsfs_07 = DSDFBlock(feat * 4, feat * 8, nf1=feat * 4, nf2=feat * 8, gc=feat * 4 // 2)
+		self.dsfs_08 = DSDFBlock(feat * 2, feat * 4, nf1=feat * 2, nf2=feat * 4, gc=feat * 2 // 2)
+		self.dsfs_09 = DSDFBlock(feat * 1, feat * 2, nf1=feat * 1, nf2=feat * 2, gc=feat * 1 // 2)
+		self.dsfs_10 = DSDFBlock(feat * 4, feat * 8, nf1=feat * 4, nf2=feat * 8, gc=feat * 4 // 2)
 
 		# SHAPE STREAM ------------IN PROGRESS-------------------
-		self.shape_stream = ShapeStream(init_feat)
+		self.shape_stream = ShapeStream(feat)
 
 		# DECODER
 		# Stage 1:
-		self.att_1 = AttentionBlock(
-			init_feat * 4, init_feat * 8,
-			init_feat * 8)
-		self.up_1 = UpBlock(init_feat * 4, init_feat * 8)
-		self.dualatt_1 = DualAttBlock(
-			init_feat * 4, init_feat * 8,
-			init_feat * 4)
-		self.n34_t = nn.Conv2d(
-			init_feat * 4 + init_feat * 8, init_feat * 4,
-			kernel_size=(1, 1), stride=(1, 1),
-			padding=(0, 0)
-		)
+		self.att_1 = AttentionBlock(feat * 4, feat * 8, feat * 8)
+		self.up_1 = UpBlock(feat * 4, feat * 8)
+		self.dualatt_1 = DualAttBlock(feat * 4, feat * 8, feat * 4)
+		self.n34_t = nn.Conv2d(feat * 4 + feat * 8, feat * 4, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0))
 		self.dec_block_1 = nn.Sequential(
-			nn.BatchNorm2d(init_feat * 4),
+			nn.BatchNorm2d(feat * 4),
 			nn.ReLU(),
-			nn.Conv2d(
-				init_feat * 4,
-				init_feat * 4,
-				kernel_size=(3, 3),
-				stride=(1, 1),
-				padding=(1, 1)
-			),
-			nn.BatchNorm2d(init_feat * 4),
+			nn.Conv2d(feat * 4, feat * 4, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+			nn.BatchNorm2d(feat * 4),
 			nn.ReLU(),
-			nn.Conv2d(
-				init_feat * 4,
-				init_feat * 4,
-				kernel_size=(3, 3),
-				stride=(1, 1),
-				padding=(1, 1)
-			)
+			nn.Conv2d(feat * 4, feat * 4, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
 		)
 		self.head_dec_1 = nn.Sequential(
-			nn.Conv2d(
-				init_feat * 4, n_classes, kernel_size=(1, 1),
-				stride=(1, 1), padding=(0, 0)
-			),
-			nn.Upsample(scale_factor=4, mode='bilinear', align_corners=True))
+			nn.Conv2d(feat * 4, n_classes, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
+			nn.Upsample(scale_factor=4, mode='bilinear', align_corners=True)
+		)
 
 		# Stage 2:
-		self.att_2 = AttentionBlock(
-			init_feat * 2, init_feat * 4,
-			init_feat * 2)
-		self.up_2 = UpBlock(init_feat * 2, init_feat * 4)
-		self.dualatt_2 = DualAttBlock(
-			init_feat * 2, init_feat * 4,
-			init_feat * 2)
-		self.n24_t = nn.Conv2d(
-			init_feat * 2 + init_feat * 4, init_feat * 2,
-			kernel_size=(1, 1), stride=(1, 1),
-			padding=(0, 0)
-		)
+		self.att_2 = AttentionBlock(feat * 2, feat * 4, feat * 2)
+		self.up_2 = UpBlock(feat * 2, feat * 4)
+		self.dualatt_2 = DualAttBlock(feat * 2, feat * 4, feat * 2)
+		self.n24_t = nn.Conv2d(feat * 2 + feat * 4, feat * 2, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0))
 		self.dec_block_2 = nn.Sequential(
-			nn.BatchNorm2d(init_feat * 2),
+			nn.BatchNorm2d(feat * 2),
 			nn.ReLU(),
-			nn.Conv2d(
-				init_feat * 2,
-				init_feat * 2,
-				kernel_size=(3, 3),
-				stride=(1, 1),
-				padding=(1, 1)),
-			nn.BatchNorm2d(init_feat * 2),
+			nn.Conv2d(feat * 2, feat * 2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+			nn.BatchNorm2d(feat * 2),
 			nn.ReLU(),
-			nn.Conv2d(
-				init_feat * 2,
-				init_feat * 2,
-				kernel_size=(3, 3),
-				stride=(1, 1),
-				padding=(1, 1))
+			nn.Conv2d(feat * 2, feat * 2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
 		)
 		self.head_dec_2 = nn.Sequential(
-			nn.Conv2d(
-				init_feat * 2, n_classes, kernel_size=(1, 1),
-				stride=(1, 1), padding=(0, 0)
-			),
-			nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True))
+			nn.Conv2d(feat * 2, n_classes, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
+			nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+		)
 
 		# Stage 3:
-		self.up_3 = nn.ConvTranspose2d(
-			init_feat * 2, init_feat,
-			kernel_size=(4, 4), stride=(2, 2),
-			padding=(1, 1)
-		)
+		self.up_3 = nn.ConvTranspose2d(feat * 2, feat, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1))
 		self.n14_input = nn.Sequential(
-			nn.Conv2d(
-				init_feat + init_feat + 1, init_feat, kernel_size=(1, 1),
-				stride=(1, 1), padding=(0, 0)
-			),
-			nn.ReLU())
+			nn.Conv2d(feat + feat + 1, feat, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
+			nn.ReLU()
+		)
 		self.dec_block_3 = nn.Sequential(
-			nn.Conv2d(
-				init_feat, init_feat, kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(feat, feat, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.BatchNorm2d(init_feat))
+			nn.BatchNorm2d(feat)
+		)
 
 		self.head_dec_3 = nn.Sequential(
-			nn.Conv2d(
-				init_feat, init_feat, kernel_size=(3, 3), stride=(1, 1),
-				padding=(1, 1)
-			),
+			nn.Conv2d(feat, feat, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
 			nn.ReLU(),
-			nn.Conv2d(
-				init_feat, n_classes, kernel_size=(1, 1), stride=(1, 1),
-				padding=(0, 0)
-			))
+			nn.Conv2d(feat, n_classes, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0))
+		)
 
 	def forward(self, x, canny):
 		# ENCODER:
@@ -662,15 +476,15 @@ class MSRF(nn.Module, ABC):
 		x41 = self.n41(x31)
 
 		# MSRF-subnetwork
-		x12, x22 = self.dsfs_1(x11, x21)
-		x32, x42 = self.dsfs_2(x31, x41)
-		x12, x22 = self.dsfs_3(x12, x22)
-		x32, x42 = self.dsfs_4(x32, x42)
-		x22, x32 = self.dsfs_5(x22, x32)
-		x13, x23 = self.dsfs_6(x12, x22)
-		x33, x43 = self.dsfs_7(x32, x42)
-		x23, x33 = self.dsfs_8(x23, x33)
-		x13, x23 = self.dsfs_9(x13, x23)
+		x12, x22 = self.dsfs_01(x11, x21)
+		x32, x42 = self.dsfs_02(x31, x41)
+		x12, x22 = self.dsfs_03(x12, x22)
+		x32, x42 = self.dsfs_04(x32, x42)
+		x22, x32 = self.dsfs_05(x22, x32)
+		x13, x23 = self.dsfs_06(x12, x22)
+		x33, x43 = self.dsfs_07(x32, x42)
+		x23, x33 = self.dsfs_08(x23, x33)
+		x13, x23 = self.dsfs_09(x13, x23)
 		x33, x43 = self.dsfs_10(x33, x43)
 
 		x13 = (x13 * 0.4) + x11

@@ -1,6 +1,5 @@
 """
-CODE FORKED FROM:
-https://kornia.readthedocs.io/en/v0.1.2/_modules/torchgeometry/losses/
+original code: https://github.com/amlarraz/MSRF-Net_PyTorch/blob/master/msrf.py
 """
 import torch
 from torch import nn
@@ -136,7 +135,9 @@ class CombinedLoss(nn.Module):
 		self.dice_loss = DiceLoss()
 		self.bce_loss = nn.BCEWithLogitsLoss()
 
-	def forward(self, pred_3, pred_canny, pred_1, pred_2, msk, canny_label):
+	def forward(self, input_, target):
+		pred_3, pred_canny, pred_1, pred_2 = input_
+		msk, canny_label = target
 		msk = msk.squeeze().type(torch.int64)
 		loss_pred_1 = self.ce_loss(pred_1, msk) + self.dice_loss(pred_1, msk)
 		loss_pred_2 = self.ce_loss(pred_2, msk) + self.dice_loss(pred_2, msk)

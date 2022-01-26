@@ -11,11 +11,7 @@ from numba import njit
 import pstats
 import cProfile
 
-from sartorius_cell_instance_segmentation.datasets import SupervisedDataset
-from sartorius_cell_instance_segmentation.models import MSRF, DummyNet
-from sartorius_cell_instance_segmentation import Train
-from sartorius_cell_instance_segmentation.util import imshow
-from sartorius_cell_instance_segmentation import CombinedLoss
+import sartorius_cell_instance_segmentation as scis
 
 
 # timing template
@@ -33,16 +29,17 @@ def main():
 
 	# configuration
 	split_pct = 0.8
-	batch_size = 32
+	batch_size = 2
 	dtype = torch.float32
 	#
 
 	torch.manual_seed(188990338)  # seed for random transformations
-	transforms = torchvision.transforms.CenterCrop(size=128)
+	# transforms = torchvision.transforms.CenterCrop(size=128)
+	transforms = None
 	target_transforms = transforms
 
 	# complete dataset
-	ds = SupervisedDataset(
+	ds = scis.datasets.SupervisedDataset(
 		transforms=transforms,
 		target_transforms=target_transforms,
 		dtype=dtype,
@@ -60,7 +57,7 @@ def main():
 		generator=torch.Generator().manual_seed(711006933)
 	)
 
-	# dataloaders
+	# data-loaders
 	dl_train = torch.utils.data.DataLoader(
 		dataset=ds_train,
 		batch_size=batch_size,
@@ -85,15 +82,16 @@ def main():
 	#
 
 	# model = MSRF(in_ch=1, n_classes=2)
-	model = DummyNet(co=2)
+	model = scis.models.DummyUNet()
 
-	criterion = CombinedLoss()
+	# criterion = CombinedLoss()
+	criterion = scis.criterions.BCELoss()
 
 	optimizer = torch.optim.Adam(model.parameters())
 
 	# test_model(model=model, dtype=dtype)
 
-	Train(
+	scis.Train(
 		epochs=epochs,
 		dl_train=dl_train,
 		dl_valid=dl_valid,
@@ -123,12 +121,12 @@ def test_ds(ds, dl_train, dl_valid):
 		print(f'{mask.dtype=}')
 
 		idx = 2
-		imshow(img[idx])
-		imshow(canny[idx])
-		imshow(bounds[idx])
-		imshow(touch[idx])
-		imshow(mask[idx])
-		imshow(ds.overlay(img[idx], bounds[idx], touch[idx], mask[idx]))
+		scis.imshow(img[idx])
+		scis.imshow(canny[idx])
+		scis.imshow(bounds[idx])
+		scis.imshow(touch[idx])
+		scis.imshow(mask[idx])
+		scis.imshow(ds.overlay(img[idx], bounds[idx], touch[idx], mask[idx]))
 		plt.show()
 		break
 

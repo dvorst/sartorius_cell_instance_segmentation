@@ -20,7 +20,7 @@ class Train:
 			img, mask, canny = img.to(device), mask.to(device), canny.to(device)
 			optimizer.zero_grad()
 			y3, yb, y1, y2 = model(img, canny)
-			loss = criterion(y3, yb, y1, y2, mask, canny)
+			loss = criterion((y3, yb, y1, y2), (mask, canny))
 			loss.backward()
 			optimizer.step()
 			writer.add_scalar('loss train', loss.item(), epoch * len(dl_train) + idx)
@@ -37,7 +37,7 @@ class Train:
 			for idx, (img, canny, _, _, mask) in enumerate(dl_valid):
 				img, mask, canny = img.to(device), mask.to(device), canny.to(device)
 				y3, yb, y1, y2 = model(img, canny)
-				loss = criterion(y3, yb, y1, y2, mask, canny)
+				loss = criterion((y3, yb, y1, y2), (mask, canny))
 				writer.add_scalar('loss valid', loss.item(), epoch * len(dl_valid) + idx)
 				print(f'Eval\t{(idx + 1):3.0f}/{len(dl_valid)}\t{loss.item():5.4f}')
 			writer.add_image('test_pred', y3[0, :, :, :], epoch)

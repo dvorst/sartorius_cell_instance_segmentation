@@ -4,7 +4,7 @@ import torch
 
 class DummyNet(nn.Module):
 
-	def __init__(self, co):
+	def __init__(self, co=2):
 		"""
 		:param co: #channels output
 		"""

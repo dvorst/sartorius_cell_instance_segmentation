@@ -89,6 +89,8 @@ def main():
 
 	optimizer = torch.optim.Adam(model.parameters())
 
+	summary_writer = scis.SummaryWriterExtended(n_imgs_per_epoch=10)
+
 	# test_model(model=model, dtype=dtype)
 
 	scis.Train(
@@ -99,6 +101,7 @@ def main():
 		device=device,
 		optimizer=optimizer,
 		criterion=criterion,
+		summary_writer=summary_writer,
 		dtype=dtype
 	)
 

@@ -12,7 +12,7 @@ import cv2
 import dataclasses
 
 from .annotations import to_annotation
-from sartorius_cell_instance_segmentation.util import imshow
+from ..util import imshow
 
 
 class SupervisedDataset(torch.utils.data.Dataset):

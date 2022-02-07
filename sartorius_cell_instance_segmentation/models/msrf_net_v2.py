@@ -54,6 +54,7 @@ class MSRF(nn.Module):
 class Final(nn.Module):
 	def __init__(self, c, n_classes):
 		super().__init__()
+		c = [1]
 		self.concatenation = Concatenation()
 		self.c3x3 = nn.Conv2d(c[0] + 1, c[0], (3, 3), padding=1)
 		self.c1x1 = nn.Conv2d(c[0], n_classes, (1, 1))
@@ -583,7 +584,7 @@ def test():
 	import pstats
 	import cProfile
 
-	img = torch.empty(size=(10, 1, 704, 520))
+	img = torch.empty(size=(1, 1, 704, 520))
 	img_grad = np.empty(img.shape)
 	for idx, i in enumerate(img):
 		img_grad[idx] = cv2.Canny(i.numpy().transpose((1, 2, 0)).astype(np.uint8), 10, 100)

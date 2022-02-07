@@ -38,9 +38,9 @@ class MSRF(nn.Module):
 			scales_ss = [1, 2, 4, 8]
 		self.encoder = Encoder(ci, c_enc, scales=scales_enc)
 		self.msrf_subnet = MSRFSubNet(c_enc, n_blocks=n_msrf_blocks, n_block_layers=n_msrf_block_layers)
-		self.decoder = Decoder(c_enc, scales_enc[1:])
-		self.shape_stream = ShapeStream(c_enc, ch=c_ss, scales=scales_ss)
-		self.final = Final(c_enc, n_classes)
+		self.decoder = Decoder(c_enc, scales_enc)
+		self.shape_stream = ShapeStream(c_enc, ch=c_ss, scales=scales_ss, scale_enc1=scales_enc[0])
+		self.final = Final(c_enc, scales_enc, n_classes)
 
 	def forward(self, x, image_gradients):
 		x = self.encoder(x)  # x = [E1, E2, E3, E4]
@@ -52,16 +52,21 @@ class MSRF(nn.Module):
 
 
 class Final(nn.Module):
-	def __init__(self, c, n_classes):
+	def __init__(self, c, scales_enc, n_classes):
 		super().__init__()
 		c = [1]
+		s = scales_enc[0]
 		self.concatenation = Concatenation()
+		self.conv_t = nn.ConvTranspose2d(c[0], c[0], (s, s), stride=(s, s), bias=False) if s != 1 else None
 		self.c3x3 = nn.Conv2d(c[0] + 1, c[0], (3, 3), padding=1)
 		self.c1x1 = nn.Conv2d(c[0], n_classes, (1, 1))
 		self.relu = nn.ReLU()
 
 	def forward(self, x, x_ss):
+		if self.conv_t is not None:
+			x = self.conv_t(x)
 		x = self.concatenation([x_ss, x])
+		del x_ss
 		x = self.c3x3(x)
 		x = self.relu(x)
 		x = self.c1x1(x)
@@ -302,7 +307,7 @@ class DSDFScale(nn.Module):
 class ShapeStream(nn.Module):
 	""" https://arxiv.org/pdf/1907.05740v1.pdf """
 
-	def __init__(self, c, ch=None, scales=None):
+	def __init__(self, c, ch=None, scales=None, scale_enc1: int = 1):
 		""" ci: in_channels, ch: channels hidden """
 		super().__init__()
 		if ch is None:
@@ -345,7 +350,7 @@ class ShapeStream(nn.Module):
 
 		self.gc = nn.ModuleList([GatedConvolution(c) for c in ch[1:-1]])
 
-		self.scale = nn.UpsamplingBilinear2d(scale_factor=1 / scales[0]) if scales[0] != 1 else None
+		self.scale = nn.UpsamplingBilinear2d(scale_factor=scale_enc1 / scales[0]) if scales[0] != 1 else None
 
 		self.out1 = nn.Sequential(
 			nn.Conv2d(ch[-2], ch[-1], (1, 1), bias=False),  # todo
@@ -456,12 +461,12 @@ class Decoder(nn.Module):
 		if len(c) != 4:
 			# raise ValueError(f'Current implementation only supports 4 inputs, not {len(c)}=')
 			raise ValueError('Current implementation only supports 4 inputs, not %i', len(c))
-		self.d2 = DecoderBlock(ci_dec=c[3], ci_msrf=c[2], scale=scales[0])
-		self.deep_supervision_d2 = DeepSupervision(c[2], scale=scales[1] * scales[2])
-		self.d3 = DecoderBlock(ci_dec=c[2], ci_msrf=c[1], scale=scales[1])
-		self.deep_supervision_d3 = DeepSupervision(c[1], scale=scales[2])
+		self.d2 = DecoderBlock(ci_dec=c[3], ci_msrf=c[2], scale=scales[3])
+		self.deep_supervision_d2 = DeepSupervision(c[2], scale=scales[0] * scales[1] * scales[2])
+		self.d3 = DecoderBlock(ci_dec=c[2], ci_msrf=c[1], scale=scales[2])
+		self.deep_supervision_d3 = DeepSupervision(c[1], scale=scales[0] * scales[1])
 		# though not mentioned in the original paper, their code does not use attention blocks in the last enc block
-		self.d4 = DecoderBlock(ci_dec=c[1], ci_msrf=c[0], scale=scales[2], attentions=False)
+		self.d4 = DecoderBlock(ci_dec=c[1], ci_msrf=c[0], scale=scales[1], attentions=False)
 		self.final = nn.Sequential(
 			nn.Conv2d(c[0], c[0], (3, 3), padding=(1, 1)),
 			nn.ReLU(),
@@ -584,7 +589,7 @@ def test():
 	import pstats
 	import cProfile
 
-	img = torch.empty(size=(1, 1, 704, 520))
+	img = torch.empty(size=(16, 1, 704, 520 + 8))
 	img_grad = np.empty(img.shape)
 	for idx, i in enumerate(img):
 		img_grad[idx] = cv2.Canny(i.numpy().transpose((1, 2, 0)).astype(np.uint8), 10, 100)
@@ -622,7 +627,10 @@ def test():
 	# for o in out:
 	# 	print(o.shape)
 
-	m = MSRF(c_enc=[16, 64, 128, 256], c_ss=[16, 16, 16, 8, 1], scales_ss=[0.5, 1, 2, 4], n_msrf_block_layers=2)
+	m = MSRF(
+		c_enc=[16, 64, 128, 256], c_ss=[16, 16, 16, 8, 1], scales_enc=[2, 2, 2, 2], scales_ss=[0.5, 1, 2, 4],
+		n_msrf_block_layers=2
+	)
 
 	# memory footprint of model
 	# mem_params = sum([param.nelement() * param.element_size() for param in m.parameters()])

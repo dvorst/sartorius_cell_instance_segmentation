@@ -90,7 +90,8 @@ class EncoderBlock(nn.Module):
 		""" ci: in_channels, co: out_channels, pool: whether to use maxpool, residual: whether to use res block """
 		super().__init__()
 		if scale < 1:
-			raise ValueError(f'only scales of 1 and larger are supported, not {scale=}')
+			# raise ValueError(f'only scales of 1 and larger are supported, not {scale=}')
+			raise ValueError('only scales of 1 and larger are supported, not %i' % scale)
 		self.residual = nn.Sequential(
 			nn.Conv2d(ci, ci, (3, 3), padding=(1, 1), bias=False),
 			nn.ReLU(),
@@ -172,9 +173,11 @@ class MSRFSubNet(nn.Module):
 		""" c: output channels of [E1, E2, E3, E4] (encoder blocks), the output channels of SMRF are the same"""
 		super().__init__()
 		if n_blocks not in [7, 10]:
-			raise ValueError(f'Current implementation only supports 7 or 9 blocks, not {n_blocks}')
+			# raise ValueError(f'Current implementation only supports 7 or 9 blocks, not {n_blocks}')
+			raise ValueError('Current implementation only supports 7 or 9 blocks, not %i' % n_blocks)
 		if len(c) != 4:
-			raise ValueError(f'Current implementation only supports 4 inputs, not {len(c)}=')
+			# raise ValueError(f'Current implementation only supports 4 inputs, not {len(c)=}')
+			raise ValueError('Current implementation only supports 4 inputs, not %i' % len(c))
 		self.dsdf_blocks = nn.ModuleList([])
 		for idx in range(n_blocks):
 			if idx in [0, 2, 5, 8]:  # upper blocks
@@ -216,7 +219,8 @@ class DSDFBlock(nn.Module):
 		Note: high/low output channels will be the same as high/low inputs. """
 		super().__init__()
 		if n_layers < 1:
-			raise ValueError(f'n_layers must bbe larger than 1, not {n_layers=}')
+			# raise ValueError(f'n_layers must bbe larger than 1, not {n_layers=}')
+			raise ValueError('n_layers must bbe larger than 1, not %i' % n_layers)
 		self.layer_h, self.layer_l, self.down, self.up = \
 			nn.ModuleList([]), nn.ModuleList([]), nn.ModuleList([]), nn.ModuleList([])
 		for idx in range(n_layers):
@@ -306,11 +310,16 @@ class ShapeStream(nn.Module):
 			scales = [1, 2, 4, 8]
 
 		if len(c) != 4:
-			raise ValueError(f'Current implementation only supports 4 inputs, not {len(c)}=')
+			# raise ValueError(f'Current implementation only supports 4 inputs, not {len(c)}=')
+			raise ValueError('Current implementation only supports 4 inputs, not %i' % len(c))
 		if len(ch) != len(c) + 1:
-			raise ValueError(f'number of hidden chan should be equal to input chan +1 {len(ch)=} != {len(c)+1=}')
+			# raise ValueError(f'number of hidden chan should be equal to input chan +1 {len(ch)=} != {len(c)+1=}')
+			raise ValueError(
+				'number of hidden chan should be equal to input chan +1, %i != %i' % (len(ch), len(c) + 1)
+			)
 		if len(scales) != len(c):
-			raise ValueError(f'number of scales should be equal to input channels {len(scales)=} != {len(c)=}')
+			# raise ValueError(f'number of scales should be equal to input channels {len(scales)=} != {len(c)=}')
+			raise ValueError('number of scales should be equal to input channels %i != %i' % (len(scales), len(c)))
 
 		self.conv_in = nn.ModuleList([])
 		for idx, (c, scale) in enumerate(zip(c, scales)):
@@ -444,7 +453,8 @@ class Decoder(nn.Module):
 		""" c: output channels of MSRF subnetwork """
 		super().__init__()
 		if len(c) != 4:
-			raise ValueError(f'Current implementation only supports 4 inputs, not {len(c)}=')
+			# raise ValueError(f'Current implementation only supports 4 inputs, not {len(c)}=')
+			raise ValueError('Current implementation only supports 4 inputs, not %i', len(c))
 		self.d2 = DecoderBlock(ci_dec=c[3], ci_msrf=c[2], scale=scales[0])
 		self.deep_supervision_d2 = DeepSupervision(c[2], scale=scales[1] * scales[2])
 		self.d3 = DecoderBlock(ci_dec=c[2], ci_msrf=c[1], scale=scales[1])
@@ -622,11 +632,12 @@ def test():
 	# exit()
 
 	# timing template
-	with cProfile.Profile() as pr:
-		out = m(img, img_grad)
-	stats = pstats.Stats(pr)
-	stats.sort_stats(pstats.SortKey.TIME)
-	stats.print_stats()
+	out = m(img, img_grad)
+	# with cProfile.Profile() as pr:
+	# 	out = m(img, img_grad)
+	# stats = pstats.Stats(pr)
+	# stats.sort_stats(pstats.SortKey.TIME)
+	# stats.print_stats()
 	# stats.dump_stats(filename='../../temp/timing_model.prof')
 
 	# out = m(img, img_grad)

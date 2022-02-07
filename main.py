@@ -106,32 +106,32 @@ def main():
 	)
 
 
-def test_ds(ds, dl_train, dl_valid):
-	print(f'{len(ds)=}')
-	print(f'{len(dl_train)=}')
-	print(f'{len(dl_valid)}')
-	for img, canny, bounds, touch, mask in dl_train:
-		print(f'{img.shape=}')
-		print(f'{canny.shape=}')
-		print(f'{bounds.shape=}')
-		print(f'{touch.shape=}')
-		print(f'{mask.shape=}')
-
-		print(f'{img.dtype=}')
-		print(f'{canny.dtype=}')
-		print(f'{bounds.dtype=}')
-		print(f'{touch.dtype=}')
-		print(f'{mask.dtype=}')
-
-		idx = 2
-		scis.imshow(img[idx])
-		scis.imshow(canny[idx])
-		scis.imshow(bounds[idx])
-		scis.imshow(touch[idx])
-		scis.imshow(mask[idx])
-		scis.imshow(ds.overlay(img[idx], bounds[idx], touch[idx], mask[idx]))
-		plt.show()
-		break
+# def test_ds(ds, dl_train, dl_valid):
+# 	print(f'{len(ds)=}')
+# 	print(f'{len(dl_train)=}')
+# 	print(f'{len(dl_valid)}')
+# 	for img, canny, bounds, touch, mask in dl_train:
+# 		print(f'{img.shape=}')
+# 		print(f'{canny.shape=}')
+# 		print(f'{bounds.shape=}')
+# 		print(f'{touch.shape=}')
+# 		print(f'{mask.shape=}')
+#
+# 		print(f'{img.dtype=}')
+# 		print(f'{canny.dtype=}')
+# 		print(f'{bounds.dtype=}')
+# 		print(f'{touch.dtype=}')
+# 		print(f'{mask.dtype=}')
+#
+# 		idx = 2
+# 		scis.imshow(img[idx])
+# 		scis.imshow(canny[idx])
+# 		scis.imshow(bounds[idx])
+# 		scis.imshow(touch[idx])
+# 		scis.imshow(mask[idx])
+# 		scis.imshow(ds.overlay(img[idx], bounds[idx], touch[idx], mask[idx]))
+# 		plt.show()
+# 		break
 
 
 def test_model(model, dtype):

@@ -28,7 +28,8 @@ class Train:
 			loss.backward()
 			optimizer.step()
 			writer.add_scalar('loss train', loss.item(), epoch * len(dl_train) + idx)
-			print(f'Train\t{(idx + 1):3.0f}/{len(dl_train)}\t{loss.item():5.4f}')
+			# print(f'Train\t{(idx + 1):3.0f}/{len(dl_train)}\t{loss.item():5.4f}')
+			print('Train\t%3.0f/%i\t%5.4f' % (idx+1, len(dl_train), loss.item()))
 			if idx < writer.n_imgs_per_epoch:
 				for idx_batch in range(batch_size):
 					# writer.append_images('train_canny', canny, epoch)
@@ -45,7 +46,8 @@ class Train:
 				y3, yb, y1, y2 = model(img, canny)
 				loss = criterion((y3, yb, y1, y2), (mask, canny))
 				writer.add_scalar('loss valid', loss.item(), epoch * len(dl_valid) + idx)
-				print(f'Eval\t{(idx + 1):3.0f}/{len(dl_valid)}\t{loss.item():5.4f}')
+				# print(f'Eval\t{(idx + 1):3.0f}/{len(dl_valid)}\t{loss.item():5.4f}')
+				print('Eval\t%3.0f/%i\t%5.4f' % (idx+1,len(dl_valid), loss.item))
 				# writer.append_images('test_canny', canny, epoch)
 				writer.append_images('test_img', img, epoch)
 				writer.append_images('test_mask', mask, epoch)

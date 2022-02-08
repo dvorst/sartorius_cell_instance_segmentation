@@ -11,6 +11,11 @@ from typing import List
 import sys
 
 
+def cumulative_product(x):
+	""" if x=[1,2,3,4] then this function returns [1, 1*2, 1*2*3, 1*2*3*4] """
+	return torch.tensor([torch.prod(torch.tensor(x[:(idx + 1)])) for idx in range(len(x))])
+
+
 class MSRF(nn.Module):
 	""" See original paper [1] figure 2
 	[1] https://arxiv.org/pdf/2105.07451v1.pdf"""
@@ -20,8 +25,8 @@ class MSRF(nn.Module):
 			ci: int = 1,
 			c_enc: List = None,
 			c_ss: List = None,
-			scales_enc: List = None,
-			scales_ss: List = None,
+			downscales_enc: List = None,
+			downscale_ss: int = 1,
 			n_classes: int = 1,
 			n_msrf_blocks: int = 7,
 			n_msrf_block_layers: int = 5
@@ -32,15 +37,13 @@ class MSRF(nn.Module):
 			c_enc = [32, 64, 128, 256]
 		if c_ss is None:
 			c_ss = [32, 32, 16, 8, 1]
-		if scales_enc is None:
-			scales_enc = [1, 2, 2, 2]
-		if scales_ss is None:
-			scales_ss = [1, 2, 4, 8]
-		self.encoder = Encoder(ci, c_enc, scales=scales_enc)
+		if downscales_enc is None:
+			downscales_enc = [1, 2, 2, 2]
+		self.encoder = Encoder(ci, c_enc, scales=downscales_enc)
 		self.msrf_subnet = MSRFSubNet(c_enc, n_blocks=n_msrf_blocks, n_block_layers=n_msrf_block_layers)
-		self.decoder = Decoder(c_enc, scales_enc)
-		self.shape_stream = ShapeStream(c_enc, ch=c_ss, scales=scales_ss, scale_enc1=scales_enc[0])
-		self.final = Final(c_enc, scales_enc, n_classes)
+		self.decoder = Decoder(c_enc, scales=downscales_enc)
+		self.shape_stream = ShapeStream(c_enc, ch=c_ss, scales_enc=downscales_enc, downscale_ss=downscale_ss)
+		self.final = Final(c_enc, scales=downscales_enc, n_classes=n_classes)
 
 	def forward(self, x, image_gradients):
 		x = self.encoder(x)  # x = [E1, E2, E3, E4]
@@ -52,10 +55,10 @@ class MSRF(nn.Module):
 
 
 class Final(nn.Module):
-	def __init__(self, c, scales_enc, n_classes):
+	def __init__(self, c, scales, n_classes):
 		super().__init__()
 		c = [1]
-		s = scales_enc[0]
+		s = scales[0]
 		self.concatenation = Concatenation()
 		self.conv_t = nn.ConvTranspose2d(c[0], c[0], (s, s), stride=(s, s), bias=False) if s != 1 else None
 		self.c3x3 = nn.Conv2d(c[0] + 1, c[0], (3, 3), padding=1)
@@ -75,20 +78,24 @@ class Final(nn.Module):
 
 
 class Encoder(nn.Module):
-	def __init__(self, ci, co, scales):
+	def __init__(self, ci, co, scales, use_residuals=None):
 		super().__init__()
 		# c = [32, 64, 128, 256]
-		self.e1 = EncoderBlock(ci=ci, co=co[0], residual=False, scale=scales[0])
-		self.e2 = EncoderBlock(ci=co[0], co=co[1], residual=True, scale=scales[1])
-		self.e3 = EncoderBlock(ci=co[1], co=co[2], residual=True, scale=scales[2])
-		self.e4 = EncoderBlock(ci=co[2], co=co[3], residual=True, scale=scales[3])
+		if use_residuals is None:
+			use_residuals = [True] * len(co)
+			use_residuals.insert(0, False)
+		ci = [ci, *co]
+		self.encoder_blocks = nn.ModuleList([
+			EncoderBlock(ci=ci[idx], co=c, residual=r, scale=s)
+			for idx, (c, r, s) in enumerate(zip(co, use_residuals, scales))
+		])
 
 	def forward(self, x):
-		e1 = self.e1(x)
-		e2 = self.e2(e1)
-		e3 = self.e3(e2)
-		x = self.e4(e3)
-		return e1, e2, e3, x
+		e = []
+		for encoder_block in self.encoder_blocks:
+			x = encoder_block(x)
+			e.append(x)
+		return e
 
 
 class EncoderBlock(nn.Module):
@@ -307,13 +314,9 @@ class DSDFScale(nn.Module):
 class ShapeStream(nn.Module):
 	""" https://arxiv.org/pdf/1907.05740v1.pdf """
 
-	def __init__(self, c, ch=None, scales=None, scale_enc1: int = 1):
+	def __init__(self, c, ch=None, scales_enc=None, downscale_ss: int = 1):
 		""" ci: in_channels, ch: channels hidden """
 		super().__init__()
-		if ch is None:
-			ch = [64, 32, 16, 8, 1]
-		if scales is None:
-			scales = [1, 2, 4, 8]
 
 		if len(c) != 4:
 			# raise ValueError(f'Current implementation only supports 4 inputs, not {len(c)}=')
@@ -323,12 +326,14 @@ class ShapeStream(nn.Module):
 			raise ValueError(
 				'number of hidden chan should be equal to input chan +1, %i != %i' % (len(ch), len(c) + 1)
 			)
-		if len(scales) != len(c):
+		if len(scales_enc) != len(c):
 			# raise ValueError(f'number of scales should be equal to input channels {len(scales)=} != {len(c)=}')
-			raise ValueError('number of scales should be equal to input channels %i != %i' % (len(scales), len(c)))
+			raise ValueError('number of scales should be equal to input channels %i != %i' % (len(scales_enc), len(c)))
+
+		scales_enc = cumulative_product(scales_enc) / downscale_ss
 
 		self.conv_in = nn.ModuleList([])
-		for idx, (c, scale) in enumerate(zip(c, scales)):
+		for idx, (c, scale) in enumerate(zip(c, scales_enc)):
 			co = ch[0] if idx == 0 else 1  # every conv has only 1 output channel, except for the first one
 			if scale == 1:  # skip up-sampling if scale is 1
 				self.conv_in.append(nn.Conv2d(c, co, (1, 1)))
@@ -355,7 +360,7 @@ class ShapeStream(nn.Module):
 			nn.Sigmoid()
 		)
 
-		self.scale = nn.UpsamplingBilinear2d(scale_factor=scale_enc1 / scales[0]) if scales[0] != 1 else None
+		self.scale = nn.UpsamplingBilinear2d(scale_factor=downscale_ss) if downscale_ss != 1 else None
 
 		self.out2 = nn.Sequential(
 			Concatenation(),
@@ -589,7 +594,7 @@ def test():
 	import pstats
 	import cProfile
 
-	img = torch.empty(size=(16, 1, 704, 520 + 8))
+	img = torch.empty(size=(1, 1, 704, 520 + 8))
 	img_grad = np.empty(img.shape)
 	for idx, i in enumerate(img):
 		img_grad[idx] = cv2.Canny(i.numpy().transpose((1, 2, 0)).astype(np.uint8), 10, 100)
@@ -628,8 +633,8 @@ def test():
 	# 	print(o.shape)
 
 	m = MSRF(
-		c_enc=[16, 64, 128, 256], c_ss=[16, 16, 16, 8, 1], scales_enc=[2, 2, 2, 2], scales_ss=[0.5, 1, 2, 4],
-		n_msrf_block_layers=2
+		c_enc=[16, 64, 128, 256], c_ss=[16, 16, 16, 8, 1], downscales_enc=[2, 2, 2, 2], n_msrf_block_layers=2,
+		downscale_ss=2
 	)
 
 	# memory footprint of model

@@ -350,12 +350,12 @@ class ShapeStream(nn.Module):
 
 		self.gc = nn.ModuleList([GatedConvolution(c) for c in ch[1:-1]])
 
-		self.scale = nn.UpsamplingBilinear2d(scale_factor=scale_enc1 / scales[0]) if scales[0] != 1 else None
-
 		self.out1 = nn.Sequential(
 			nn.Conv2d(ch[-2], ch[-1], (1, 1), bias=False),  # todo
 			nn.Sigmoid()
 		)
+
+		self.scale = nn.UpsamplingBilinear2d(scale_factor=scale_enc1 / scales[0]) if scales[0] != 1 else None
 
 		self.out2 = nn.Sequential(
 			Concatenation(),
@@ -370,9 +370,9 @@ class ShapeStream(nn.Module):
 			edge_out = res(edge_out)
 			y = self.conv_in[idx + 1](x_)
 			edge_out = gc(edge_out, y)
+		edge_out = self.out1(edge_out)
 		if self.scale is not None:
 			edge_out = self.scale(edge_out)
-		edge_out = self.out1(edge_out)
 		x = self.out2([edge_out, image_gradients])
 		return x, edge_out  # edge_out is used to calculate edge_loss
 

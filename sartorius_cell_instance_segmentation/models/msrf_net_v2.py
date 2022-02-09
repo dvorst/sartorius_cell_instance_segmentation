@@ -27,7 +27,6 @@ class MSRF(nn.Module):
 			c_ss: List = None,
 			downscales_enc: List = None,
 			downscale_ss: int = 1,
-			n_classes: int = 1,
 			n_msrf_blocks: int = 7,
 			n_msrf_block_layers: int = 5
 	):
@@ -43,7 +42,7 @@ class MSRF(nn.Module):
 		self.msrf_subnet = MSRFSubNet(c_enc, n_blocks=n_msrf_blocks, n_block_layers=n_msrf_block_layers)
 		self.decoder = Decoder(c_enc, scales=downscales_enc)
 		self.shape_stream = ShapeStream(c_enc, ch=c_ss, scales_enc=downscales_enc, downscale_ss=downscale_ss)
-		self.final = Final(c_enc, scales=downscales_enc, n_classes=n_classes)
+		self.final = Final(scales=downscales_enc)
 
 	def forward(self, x, image_gradients):
 		x = self.encoder(x)  # x = [E1, E2, E3, E4]
@@ -55,14 +54,13 @@ class MSRF(nn.Module):
 
 
 class Final(nn.Module):
-	def __init__(self, c, scales, n_classes):
+	def __init__(self, scales):
 		super().__init__()
-		c = [1]
 		s = scales[0]
+		self.conv_t = nn.ConvTranspose2d(1, 1, (s, s), stride=(s, s), bias=False) if s != 1 else None
 		self.concatenation = Concatenation()
-		self.conv_t = nn.ConvTranspose2d(c[0], c[0], (s, s), stride=(s, s), bias=False) if s != 1 else None
-		self.c3x3 = nn.Conv2d(c[0] + 1, c[0], (3, 3), padding=1)
-		self.c1x1 = nn.Conv2d(c[0], n_classes, (1, 1))
+		self.c3x3 = nn.Conv2d(2, 1, (3, 3), padding=1)
+		self.c1x1 = nn.Conv2d(1, 1, (1, 1))
 		self.relu = nn.ReLU()
 
 	def forward(self, x, x_ss):
@@ -125,7 +123,7 @@ class EncoderBlock(nn.Module):
 
 	def forward(self, x):
 		if self.residual is not None:
-			x += self.residual(x)
+			x = x + self.residual(x)
 		if self.pool is not None:
 			x = self.pool(x)
 		x = self.layers(x)
@@ -264,8 +262,8 @@ class DSDFBlock(nn.Module):
 			mh, ml = self.layer_h[idx + 1]([*cat_h, up(ml)]), self.layer_l[idx + 1]([*cat_l, down(mh)])
 		# mh *= 0.4  # this action is performed in original paper, but it shouldn't have any effect (not tested)
 		# ml *= 0.4  # this action is performed in original paper, but it shouldn't have any effect (not tested)
-		mh += xh
-		ml += xl
+		mh = mh + xh
+		ml = ml + xl
 		return mh, ml
 
 
@@ -418,7 +416,7 @@ class ResBlock(nn.Module):
 		self.act = nn.ReLU()
 
 	def forward(self, x):
-		x += self.layers(x)
+		x = x + self.layers(x)
 		x = self.act(x)
 		return x
 
@@ -472,6 +470,7 @@ class Decoder(nn.Module):
 		self.deep_supervision_d3 = DeepSupervision(c[1], scale=scales[0] * scales[1])
 		# though not mentioned in the original paper, their code does not use attention blocks in the last enc block
 		self.d4 = DecoderBlock(ci_dec=c[1], ci_msrf=c[0], scale=scales[1], attentions=False)
+		# todo: train network with/without final layer to see whether it has much impact
 		self.final = nn.Sequential(
 			nn.Conv2d(c[0], c[0], (3, 3), padding=(1, 1)),
 			nn.ReLU(),
@@ -522,7 +521,7 @@ class DeepSupervision(nn.Module):
 	def __init__(self, ci, scale):
 		super().__init__()
 		self.conv = nn.Conv2d(ci, 1, (1, 1))
-		self.sig = nn.Sigmoid()
+		self.sig = nn.Sigmoid()  # todo change to softmax if there are more than 2 classes
 		self.up = nn.UpsamplingBilinear2d(scale_factor=scale)
 
 	def forward(self, x):

@@ -29,13 +29,13 @@ def main():
 
 	# configuration
 	split_pct = 0.8
-	batch_size = 2
+	batch_size = 16
 	dtype = torch.float32
 	#
 
 	torch.manual_seed(188990338)  # seed for random transformations
 	# transforms = torchvision.transforms.CenterCrop(size=128)
-	transforms = None
+	transforms = torchvision.transforms.Pad((0, 4))
 	target_transforms = transforms
 
 	# complete dataset
@@ -47,7 +47,7 @@ def main():
 		dir_imgs='data/sartorius-cell-instance-segmentation/train',
 		zip_data='data/SupervisedDataset.zip',
 		force_convert=False,
-		n_imgs=50
+		n_imgs=None
 	)
 
 	# train & valid dataset
@@ -78,14 +78,17 @@ def main():
 
 	# config
 	device = 'cuda' if torch.cuda.is_available() else 'cpu'
-	epochs = 3
+	epochs = 2
 	#
 
 	# model = MSRF(in_ch=1, n_classes=2)
-	model = scis.models.DummyUNet()
+	model = scis.models.MSRF(
+		c_enc=[16, 64, 128, 256], c_ss=[16, 16, 16, 8, 1], downscales_enc=[2, 2, 2, 2], n_msrf_block_layers=2,
+		downscale_ss=2,
+	)
 
-	# criterion = CombinedLoss()
-	criterion = scis.criterions.BCELoss()
+	criterion = scis.criterions.CombinedLoss()
+	# criterion = scis.criterions.BCELoss()
 
 	optimizer = torch.optim.Adam(model.parameters())
 

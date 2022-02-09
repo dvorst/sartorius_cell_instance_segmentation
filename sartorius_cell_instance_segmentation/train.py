@@ -23,8 +23,8 @@ class Train:
 		for idx, (img, canny, _, _, mask) in enumerate(dl_train):
 			img, mask, canny = img.to(device), mask.to(device), canny.to(device)
 			optimizer.zero_grad()
-			y3, yb, y1, y2 = model(img, canny)
-			loss = criterion((y3, yb, y1, y2), (mask, canny))
+			pred, edge_out, ds0, ds1 = model(img, canny)
+			loss = criterion((pred, edge_out, ds0, ds1), (mask, canny))
 			loss.backward()
 			optimizer.step()
 			writer.add_scalar('loss train', loss.item(), epoch * len(dl_train) + idx)
@@ -35,7 +35,7 @@ class Train:
 					# writer.append_images('train_canny', canny, epoch)
 					writer.append_images('train_img', img, epoch)
 					writer.append_images('train_mask', mask, epoch)
-					writer.append_images('train_pred', y3, epoch)
+					writer.append_images('train_pred', pred, epoch)
 
 	@staticmethod
 	def _eval_epoch(model, dl_valid, device, criterion, writer, epoch):
@@ -43,12 +43,12 @@ class Train:
 			model.eval()
 			for idx, (img, canny, _, _, mask) in enumerate(dl_valid):
 				img, mask, canny = img.to(device), mask.to(device), canny.to(device)
-				y3, yb, y1, y2 = model(img, canny)
-				loss = criterion((y3, yb, y1, y2), (mask, canny))
+				pred, edge_out, ds0, ds1 = model(img, canny)
+				loss = criterion((pred, edge_out, ds0, ds1), (mask, canny))
 				writer.add_scalar('loss valid', loss.item(), epoch * len(dl_valid) + idx)
 				# print(f'Eval\t{(idx + 1):3.0f}/{len(dl_valid)}\t{loss.item():5.4f}')
-				print('Eval\t%3.0f/%i\t%5.4f' % (idx+1,len(dl_valid), loss.item))
+				print('Eval\t%3.0f/%i\t%5.4f' % (idx+1,len(dl_valid), loss.item()))
 				# writer.append_images('test_canny', canny, epoch)
 				writer.append_images('test_img', img, epoch)
 				writer.append_images('test_mask', mask, epoch)
-				writer.append_images('test_pred', y3, epoch)
+				writer.append_images('test_pred', pred, epoch)

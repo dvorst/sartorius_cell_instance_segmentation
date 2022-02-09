@@ -71,7 +71,7 @@ class Final(nn.Module):
 		x = self.c3x3(x)
 		x = self.relu(x)
 		x = self.c1x1(x)
-		x = self.relu(x)
+		# x = self.relu(x) # nn.BCEWithLogitsLoss() is used to calculate loss, which uses sigmoid
 		return x
 
 
@@ -355,7 +355,7 @@ class ShapeStream(nn.Module):
 
 		self.out1 = nn.Sequential(
 			nn.Conv2d(ch[-2], ch[-1], (1, 1), bias=False),  # todo
-			nn.Sigmoid()
+			# nn.Sigmoid()  # nn.BCEWithLogitsLoss() is used to calculate loss, which itself uses sigmoid
 		)
 
 		self.scale = nn.UpsamplingBilinear2d(scale_factor=downscale_ss) if downscale_ss != 1 else None
@@ -521,12 +521,12 @@ class DeepSupervision(nn.Module):
 	def __init__(self, ci, scale):
 		super().__init__()
 		self.conv = nn.Conv2d(ci, 1, (1, 1))
-		self.sig = nn.Sigmoid()  # todo change to softmax if there are more than 2 classes
+		# self.sig = nn.Sigmoid()  # nn.BCEWithLogitsLoss() is used to calculate loss, which itself uses sigmoid
 		self.up = nn.UpsamplingBilinear2d(scale_factor=scale)
 
 	def forward(self, x):
 		x = self.conv(x)
-		x = self.sig(x)
+		# x = self.sig(x)
 		x = self.up(x)
 		return x
 

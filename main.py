@@ -29,7 +29,7 @@ def main():
 
 	# configuration
 	split_pct = 0.8
-	batch_size = 16
+	batch_size = 3
 	dtype = torch.float32
 	#
 

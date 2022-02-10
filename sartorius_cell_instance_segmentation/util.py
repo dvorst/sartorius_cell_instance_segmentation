@@ -22,18 +22,19 @@ def tensor_to_pil(t: torch.tensor):
 
 
 def imshow(img: Union[type(PIL.Image), torch.Tensor]):
-	# convert to pil image if tensor
-	img = tensor_to_pil(img) if isinstance(img, torch.Tensor) else img
+	with torch.no_grad():
+		# convert to pil image if tensor
+		img = tensor_to_pil(img.detach()) if isinstance(img, torch.Tensor) else img
 
-	# determine whether image is gray or colored
-	ch = 1 if isinstance(img.getpixel((0, 0)), int) else 3
-	cmap = 'gray' if ch == 1 else plt.rcParams['image.cmap']
+		# determine whether image is gray or colored
+		ch = 1 if isinstance(img.getpixel((0, 0)), int) else 3
+		cmap = 'gray' if ch == 1 else plt.rcParams['image.cmap']
 
-	# plot img without axis and tight layout
-	plt.figure(dpi=200)
-	plt.imshow(img, cmap=cmap)
-	plt.gca().set_axis_off()
-	plt.tight_layout()
+		# plot img without axis and tight layout
+		plt.figure(dpi=200)
+		plt.imshow(img, cmap=cmap)
+		plt.gca().set_axis_off()
+		plt.tight_layout()
 
 
 def timestamp(for_file: bool = False):
@@ -43,3 +44,13 @@ def timestamp(for_file: bool = False):
 		return datetime.datetime.now().strftime('%Y-%m-%d_%Hh%Mm%Ss')
 	else:
 		return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def prediction_to_image(prediction: torch.tensor):
+	with torch.no_grad():
+		img = torch.nn.Sigmoid()(prediction[0].detach())
+		img = img * 255
+		img = img.type(torch.uint8)
+		img = torchvision.transforms.functional.to_pil_image(img)
+		return img
+

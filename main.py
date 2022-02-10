@@ -24,18 +24,21 @@ import sartorius_cell_instance_segmentation as scis
 
 def main():
 	"""
+	Configuration
+	"""
+	split_pct = 0.8
+	batch_size = 16
+	dtype = torch.float32
+	device = 'cuda' if torch.cuda.is_available() else 'cpu'
+	epochs = 1
+
+	"""
 	Dataset
 	"""
-
-	# configuration
-	split_pct = 0.8
-	batch_size = 3
-	dtype = torch.float32
-	#
-
 	torch.manual_seed(188990338)  # seed for random transformations
 	# transforms = torchvision.transforms.CenterCrop(size=128)
 	transforms = torchvision.transforms.Pad((0, 4))
+	transforms = None
 	target_transforms = transforms
 
 	# complete dataset
@@ -47,7 +50,7 @@ def main():
 		dir_imgs='data/sartorius-cell-instance-segmentation/train',
 		zip_data='data/SupervisedDataset.zip',
 		force_convert=False,
-		n_imgs=None
+		n_imgs=30
 	)
 
 	# train & valid dataset
@@ -75,20 +78,14 @@ def main():
 	"""
 	Training
 	"""
+	model = scis.models.UNet(ds_train, prnt=True)
+	# model = scis.models.MSRF(
+	# 	c_enc=[16, 64, 128, 256], c_ss=[16, 16, 16, 8, 1], downscales_enc=[2, 2, 2, 2], n_msrf_block_layers=2,
+	# 	downscale_ss=2,
+	# )
 
-	# config
-	device = 'cuda' if torch.cuda.is_available() else 'cpu'
-	epochs = 2
-	#
-
-	# model = MSRF(in_ch=1, n_classes=2)
-	model = scis.models.MSRF(
-		c_enc=[16, 64, 128, 256], c_ss=[16, 16, 16, 8, 1], downscales_enc=[2, 2, 2, 2], n_msrf_block_layers=2,
-		downscale_ss=2,
-	)
-
-	criterion = scis.criterions.CombinedLoss()
-	# criterion = scis.criterions.BCELoss()
+	criterion = scis.criterions.UNet()
+	# criterion = scis.criterions.MSRF()
 
 	optimizer = torch.optim.Adam(model.parameters())
 

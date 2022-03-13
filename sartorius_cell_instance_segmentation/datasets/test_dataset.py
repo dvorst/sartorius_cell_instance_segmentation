@@ -1,15 +1,10 @@
 import numpy as np
-import pandas as pd
 import torch
 import torch.utils.data
 import torchvision
 import torchvision.transforms.functional
 import PIL.Image
-import pathlib
-import zipfile
 import cv2
-import dataclasses
-from .annotations import to_annotation
 from pathlib import Path
 
 

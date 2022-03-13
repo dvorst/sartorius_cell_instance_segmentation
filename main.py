@@ -50,7 +50,7 @@ def main():
 		train_csv='data/sartorius-cell-instance-segmentation/train.csv',
 		dir_imgs='data/sartorius-cell-instance-segmentation/train',
 		zip_data='data/SupervisedDataset.zip',
-		force_convert=False,
+		force_convert=True,
 		n_imgs=12
 	)
 
@@ -62,7 +62,7 @@ def main():
 	)
 
 	# test dataset
-	ds_test = scis.datasets.TestDataset(dtype=dtype,dir_pth='data/sartorius-cell-instance-segmentation/test')
+	ds_test = scis.datasets.TestDataset(dtype=dtype, dir_pth='data/sartorius-cell-instance-segmentation/test')
 
 	# data-loaders
 	dl_train = torch.utils.data.DataLoader(
@@ -115,36 +115,6 @@ def main():
 	Test
 	"""
 	scis.test(ds=dl_test, model=model, dst_pth_submission='submission.csv')
-
-
-# def test_ds(ds, dl_train, dl_valid):
-# 	print(f'{len(ds)=}')
-# 	print(f'{len(dl_train)=}')
-# 	print(f'{len(dl_valid)}')
-# 	for img, canny, bounds, touch, mask in dl_train:
-# 		print(f'{img.shape=}')
-# 		print(f'{canny.shape=}')
-# 		print(f'{bounds.shape=}')
-# 		print(f'{touch.shape=}')
-# 		print(f'{mask.shape=}')
-#
-# 		print(f'{img.dtype=}')
-# 		print(f'{canny.dtype=}')
-# 		print(f'{bounds.dtype=}')
-# 		print(f'{touch.dtype=}')
-# 		print(f'{mask.dtype=}')
-#
-# 		idx = 2
-# 		scis.imshow(img[idx])
-# 		scis.imshow(canny[idx])
-# 		scis.imshow(bounds[idx])
-# 		scis.imshow(touch[idx])
-# 		scis.imshow(mask[idx])
-# 		scis.imshow(ds.overlay(img[idx], bounds[idx], touch[idx], mask[idx]))
-# 		plt.show()
-# 		break
-
-
 
 
 if __name__ == "__main__":

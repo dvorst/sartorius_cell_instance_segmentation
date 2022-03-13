@@ -94,7 +94,7 @@ def _squared_distances(a, b):
 
 def _decompress(data, idx):
 	return torch.stack([
-		decompress_single(r['annotation'], r['mask_width_px'], r['height'])
+		decompress_single(r['annotation'], r['width'], r['height'])
 		for _, r in data.loc[data['id'] == idx].iterrows()
 	])
 

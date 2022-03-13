@@ -108,8 +108,7 @@ class SupervisedDataset(torch.utils.data.Dataset):
 		)
 
 	@classmethod
-	def _convert_data(
-			cls, train_csv, dir_imgs, zip_data, imgs_extension, print_progress, n_imgs):
+	def _convert_data(cls, train_csv, dir_imgs, zip_data, imgs_extension, print_progress, n_imgs):
 		""" Convert and save data provided by the challenge as a zipfile """
 
 		if print_progress:
@@ -144,7 +143,7 @@ class SupervisedDataset(torch.utils.data.Dataset):
 
 				# Add the annotation boundaries that touch each other
 				with zf.open(f'touch/{filename}', 'w') as file:
-					annotations._touch.save(file, 'png', optimize=True)
+					annotations.touch.save(file, 'png', optimize=True)
 
 				# add the annotation mask
 				with zf.open(f'masks/{filename}', 'w') as file:
@@ -197,9 +196,9 @@ class SupervisedDataset(torch.utils.data.Dataset):
 	def _load_zip_img(zf, filename, dtype):
 		with zf.open(filename, 'r') as file:
 			return (torchvision.transforms.functional.pil_to_tensor(PIL.Image.open(file)) / 255).to(dtype)
-			# return torch.as_tensor(np.array(
-			#     PIL.Image.open(file)), dtype=dtype
-			# ).unsqueeze(0) / 255  # change dtype to inherit dtype of class
+		# return torch.as_tensor(np.array(
+		#     PIL.Image.open(file)), dtype=dtype
+		# ).unsqueeze(0) / 255  # change dtype to inherit dtype of class
 
 	@staticmethod
 	def _sanity_check(data_ids, img_ids):
@@ -207,3 +206,30 @@ class SupervisedDataset(torch.utils.data.Dataset):
 		for data_id in data_ids:
 			if data_id not in img_ids:
 				raise Exception(f'no img found for id: {data_id}')
+
+# def test_ds(ds, dl_train, dl_valid):
+# 	print(f'{len(ds)=}')
+# 	print(f'{len(dl_train)=}')
+# 	print(f'{len(dl_valid)}')
+# 	for img, canny, bounds, touch, mask in dl_train:
+# 		print(f'{img.shape=}')
+# 		print(f'{canny.shape=}')
+# 		print(f'{bounds.shape=}')
+# 		print(f'{touch.shape=}')
+# 		print(f'{mask.shape=}')
+#
+# 		print(f'{img.dtype=}')
+# 		print(f'{canny.dtype=}')
+# 		print(f'{bounds.dtype=}')
+# 		print(f'{touch.dtype=}')
+# 		print(f'{mask.dtype=}')
+#
+# 		idx = 2
+# 		scis.imshow(img[idx])
+# 		scis.imshow(canny[idx])
+# 		scis.imshow(bounds[idx])
+# 		scis.imshow(touch[idx])
+# 		scis.imshow(mask[idx])
+# 		scis.imshow(ds.overlay(img[idx], bounds[idx], touch[idx], mask[idx]))
+# 		plt.show()
+# 		break

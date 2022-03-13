@@ -114,6 +114,9 @@ class SupervisedDataset(torch.utils.data.Dataset):
 		if print_progress:
 			print('SupervisedDataset: converting data...')
 
+		if not pathlib.Path(train_csv).exists():
+			raise ValueError('path does not exists: ', train_csv)
+
 		# load train.csv file as pandas dataframe
 		data = pd.read_csv(train_csv)
 

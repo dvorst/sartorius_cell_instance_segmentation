@@ -4,11 +4,8 @@ import pandas as pd
 import torchvision
 import torchvision.transforms.functional
 from PIL import Image
-import cProfile
-import pstats
 import dataclasses
 import PIL
-import matplotlib.pyplot as plt
 
 
 @dataclasses.dataclass
@@ -93,7 +90,6 @@ def _squared_distances(a, b):
 
 
 def _decompress(data, idx):
-	print(data)
 	return torch.stack([
 		decompress_single(r['annotation'], r['width'], r['height'])
 		for _, r in data.loc[data['id'] == idx].iterrows()

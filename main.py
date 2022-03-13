@@ -10,7 +10,9 @@ import tensorboard.main
 from numba import njit
 import pstats
 import cProfile
-
+import pandas as pd
+import numpy as np
+from typing import Optional
 import sartorius_cell_instance_segmentation as scis
 
 
@@ -21,6 +23,7 @@ import sartorius_cell_instance_segmentation as scis
 # stats.sort_stats(pstats.SortKey.TIME)
 # stats.print_stats()
 # stats.dump_stats(filename='temp/t8.prof')
+
 
 def main():
 	"""
@@ -36,13 +39,11 @@ def main():
 	Dataset
 	"""
 	torch.manual_seed(188990338)  # seed for random transformations
-	# transforms = torchvision.transforms.CenterCrop(size=128)
-	transforms = torchvision.transforms.Pad((0, 4))
-	transforms = None
+	transforms = None  # transforms = torchvision.transforms.Pad((0, 4))  # msrf-net
 	target_transforms = transforms
 
 	# complete dataset
-	ds = scis.datasets.SupervisedDataset(
+	ds_train = scis.datasets.SupervisedDataset(
 		transforms=transforms,
 		target_transforms=target_transforms,
 		dtype=dtype,
@@ -50,15 +51,18 @@ def main():
 		dir_imgs='data/sartorius-cell-instance-segmentation/train',
 		zip_data='data/SupervisedDataset.zip',
 		force_convert=False,
-		n_imgs=30
+		n_imgs=12
 	)
 
 	# train & valid dataset
 	ds_train, ds_valid = torch.utils.data.random_split(
-		dataset=ds,
-		lengths=[int(split_pct * len(ds)), len(ds) - int(split_pct * len(ds))],
+		dataset=ds_train,
+		lengths=[int(split_pct * len(ds_train)), len(ds_train) - int(split_pct * len(ds_train))],
 		generator=torch.Generator().manual_seed(711006933)
 	)
+
+	# test dataset
+	ds_test = scis.datasets.TestDataset(dtype=dtype,dir_pth='data/sartorius-cell-instance-segmentation/test')
 
 	# data-loaders
 	dl_train = torch.utils.data.DataLoader(
@@ -73,12 +77,16 @@ def main():
 		shuffle=False
 	)
 
-	# test_ds(ds=ds, dl_train=dl_train, dl_valid=dl_valid)
+	dl_test = torch.utils.data.DataLoader(
+		dataset=ds_test,
+		batch_size=batch_size,
+		shuffle=False
+	)
 
 	"""
 	Training
 	"""
-	model = scis.models.UNet(ds_train, prnt=True)
+	model = scis.models.UNet(ds_train, prnt=False)
 	# model = scis.models.MSRF(
 	# 	c_enc=[16, 64, 128, 256], c_ss=[16, 16, 16, 8, 1], downscales_enc=[2, 2, 2, 2], n_msrf_block_layers=2,
 	# 	downscale_ss=2,
@@ -91,19 +99,22 @@ def main():
 
 	summary_writer = scis.SummaryWriterExtended(n_imgs_per_epoch=10)
 
-	# test_model(model=model, dtype=dtype)
+	# scis.train(
+	# 	epochs=epochs,
+	# 	dl_train=dl_train,
+	# 	dl_valid=dl_valid,
+	# 	model=model,
+	# 	device=device,
+	# 	optimizer=optimizer,
+	# 	criterion=criterion,
+	# 	summary_writer=summary_writer,
+	# 	dtype=dtype
+	# )
 
-	scis.Train(
-		epochs=epochs,
-		dl_train=dl_train,
-		dl_valid=dl_valid,
-		model=model,
-		device=device,
-		optimizer=optimizer,
-		criterion=criterion,
-		summary_writer=summary_writer,
-		dtype=dtype
-	)
+	"""
+	Test
+	"""
+	scis.test(ds=dl_test, model=model, dst_pth_submission='submission.csv')
 
 
 # def test_ds(ds, dl_train, dl_valid):
@@ -134,12 +145,6 @@ def main():
 # 		break
 
 
-def test_model(model, dtype):
-	x = torch.randn((2, 1, 128, 128)).type(dtype)
-	canny = torch.randn((2, 1, 128, 128)).type(dtype)
-	out = model(x, canny)
-	for o in out:
-		print(o.shape)
 
 
 if __name__ == "__main__":

@@ -36,3 +36,11 @@ class DiceLoss(nn.Module):
 			raise ValueError('division by zero')
 		intersection = torch.mean(inp * target)
 		return 1. - 2. * intersection / cardinality
+
+
+def test_model(model, dtype):
+	x = torch.randn((2, 1, 128, 128)).type(dtype)
+	canny = torch.randn((2, 1, 128, 128)).type(dtype)
+	out = model(x, canny)
+	for o in out:
+		print(o.shape)

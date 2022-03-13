@@ -5,14 +5,11 @@ import torch.utils.data
 import torchvision
 import torchvision.transforms.functional
 import PIL.Image
-import matplotlib.pyplot as plt
 import pathlib
 import zipfile
 import cv2
 import dataclasses
-
 from .annotations import to_annotation
-from ..util import imshow
 
 
 class SupervisedDataset(torch.utils.data.Dataset):
@@ -62,7 +59,8 @@ class SupervisedDataset(torch.utils.data.Dataset):
 		return len(self.map)
 
 	def __getitem__(self, idx):
-		item = self.items[self.map[idx]]
+		name = self.map[idx]
+		item = self.items[name]
 		img = item.img
 		canny = item.canny
 		bounds = item.bounds
@@ -75,7 +73,7 @@ class SupervisedDataset(torch.utils.data.Dataset):
 			canny = self.target_transforms(canny)
 			touch = self.target_transforms(touch)
 			mask = self.target_transforms(mask)
-		return img, canny, bounds, touch, mask
+		return img, canny, bounds, touch, mask, name
 
 	@classmethod
 	def overlay(
@@ -114,7 +112,8 @@ class SupervisedDataset(torch.utils.data.Dataset):
 			cls, train_csv, dir_imgs, zip_data, imgs_extension, print_progress, n_imgs):
 		""" Convert and save data provided by the challenge as a zipfile """
 
-		print('SupervisedDataset: converting data...')
+		if print_progress:
+			print('SupervisedDataset: converting data...')
 
 		# load train.csv file as pandas dataframe
 		data = pd.read_csv(train_csv)
@@ -145,17 +144,18 @@ class SupervisedDataset(torch.utils.data.Dataset):
 
 				# Add the annotation boundaries that touch each other
 				with zf.open(f'touch/{filename}', 'w') as file:
-					annotations.touch.save(file, 'png', optimize=True)
+					annotations._touch.save(file, 'png', optimize=True)
 
 				# add the annotation mask
 				with zf.open(f'masks/{filename}', 'w') as file:
 					annotations.mask.save(file, 'png', optimize=True)
 
 				# print progress
-				print(
-					f'SupervisedDataset: \t{idx + 1}/{len(pths)} converted '
-					f'{str(pth)}'
-				)
+				if print_progress:
+					print(
+						f'SupervisedDataset: \t{idx + 1}/{len(pths)} converted '
+						f'{str(pth)}'
+					)
 
 	@classmethod
 	def _load_data(cls, zip_data, imgs_extension, n_imgs, dtype):

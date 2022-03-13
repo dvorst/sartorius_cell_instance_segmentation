@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import PIL
+import PIL.Image
 import datetime
 import torch
 import torchvision
@@ -53,4 +53,3 @@ def prediction_to_image(prediction: torch.tensor):
 		img = img.type(torch.uint8)
 		img = torchvision.transforms.functional.to_pil_image(img)
 		return img
-

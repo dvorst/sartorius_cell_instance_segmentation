@@ -50,7 +50,7 @@ def main():
 		train_csv='data/sartorius-cell-instance-segmentation/train.csv',
 		dir_imgs='data/sartorius-cell-instance-segmentation/train',
 		zip_data='data/SupervisedDataset.zip',
-		force_convert=True,
+		force_convert=False,
 		n_imgs=12
 	)
 
@@ -99,17 +99,17 @@ def main():
 
 	summary_writer = scis.SummaryWriterExtended(n_imgs_per_epoch=10)
 
-	# scis.train(
-	# 	epochs=epochs,
-	# 	dl_train=dl_train,
-	# 	dl_valid=dl_valid,
-	# 	model=model,
-	# 	device=device,
-	# 	optimizer=optimizer,
-	# 	criterion=criterion,
-	# 	summary_writer=summary_writer,
-	# 	dtype=dtype
-	# )
+	scis.train(
+		epochs=epochs,
+		dl_train=dl_train,
+		dl_valid=dl_valid,
+		model=model,
+		device=device,
+		optimizer=optimizer,
+		criterion=criterion,
+		summary_writer=summary_writer,
+		dtype=dtype
+	)
 
 	"""
 	Test

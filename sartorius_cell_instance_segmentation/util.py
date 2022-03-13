@@ -46,10 +46,3 @@ def timestamp(for_file: bool = False):
 		return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
-def prediction_to_image(prediction: torch.tensor):
-	with torch.no_grad():
-		img = torch.nn.Sigmoid()(prediction[0].detach())
-		img = img * 255
-		img = img.type(torch.uint8)
-		img = torchvision.transforms.functional.to_pil_image(img)
-		return img

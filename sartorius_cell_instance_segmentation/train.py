@@ -107,7 +107,7 @@ def show_overlay(
 		plt.imshow(img)
 		plt.gca().set_axis_off()
 		plt.tight_layout()
-		# plt.show()
+		plt.show()
 
 
 def _gray_img_to_col(gray_img: torch.tensor, color):
